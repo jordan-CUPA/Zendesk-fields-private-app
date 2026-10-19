@@ -1,0 +1,26 @@
+{
+  "name": "Dynamic Field Manager",
+  "author": {
+    "name": "Name",
+    "email": "Test@example.com"
+  },
+  "defaultLocale": "en",
+  "private": true,
+  "location": {
+    "support": {
+      "ticket_sidebar": "assets/sidebar.html",
+      "nav_bar": "assets/admin.html"
+    }
+  },
+  "parameters": [
+    {
+      "name": "field_rules_config",
+      "type": "multiline",
+      "secure": false,
+      "default": "[]",
+      "hidden": true
+    }
+  ],
+  "version": "1.0.0",
+  "frameworkVersion": "2.0"
+}

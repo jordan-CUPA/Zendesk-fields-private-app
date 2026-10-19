@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Field Manager</title>
+
+    <script
+        type="text/javascript"
+        src="https://static.zdassets.com/zendesk_app_framework_sdk/2.0/zaf_sdk.min.js">
+    </script>
+
+    <style>
+        :root {
+            --zd-blue: #1f73b7;
+            --zd-blue-dark: #174f7e;
+            --zd-green: #038153;
+            --zd-red: #d8262c;
+            --zd-text: #2f3941;
+            --zd-muted: #68737d;
+            --zd-border: #d8dcde;
+            --zd-bg: #f8f9f9;
+            --zd-white: #ffffff;
+            --zd-hover: #f0f2f3;
+            --zd-purple: #6b4eff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family:
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+            font-size: 14px;
+            color: var(--zd-text);
+            background: var(--zd-bg);
+        }
+
+        .page {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px;
+        }
+
+        /* Header */
+
+        .header {
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            margin: 0 0 6px;
+            font-size: 24px;
+            line-height: 32px;
+            font-weight: 600;
+            color: #1f2a30;
+        }
+
+        .header p {
+            margin: 0;
+            max-width: 850px;
+            color: var(--zd-muted);
+            line-height: 21px;
+        }
+
+        /* Status / Loading */
+
+        .status-banner {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border: 1px solid var(--zd-border);
+            border-radius: 6px;
+            background: var(--zd-white);
+        }
+
+        .status-banner.visible {
+            display: flex;
+        }
+
+        .status-banner.success {
+            border-color: #b7dfcf;
+            background: #f1faf6;
+            color: #176b4c;
+        }
+
+        .status-banner.error {
+            border-color: #efb5b8;
+            background: #fff5f5;
+            color: #a91e23;
+        }
+
+        .status-banner.info {
+            background: #f5f9fc;
+            color: #315a78;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            flex: 0 0 auto;
+            border: 2px solid #d8e5ef;
+            border-top-color: var(--zd-blue);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Cards */
+
+        .card {
+            margin-bottom: 20px;
+            overflow: hidden;
+            background: var(--zd-white);
+            border: 1px solid var(--zd-border);
+            border-radius: 8px;
+        }
+
+        .card-header {
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--zd-border);
+        }
+
+        .card-header h2 {
+            margin: 0 0 4px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .card-header p {
+            margin: 0;
+            color: var(--zd-muted);
+            font-size: 13px;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        /* Rule Builder */
+
+        .rule-grid {
+            display: grid;
+            grid-template-columns:
+                minmax(220px, 1.5fr)
+                minmax(180px, 1fr)
+                minmax(180px, 1fr)
+                minmax(220px, 1.3fr);
+            gap: 16px;
+        }
+
+        .field-group label {
+            display: block;
+            margin-bottom: 7px;
+            color: #2f3941;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .field-help {
+            margin-top: 5px;
+            color: var(--zd-muted);
+            font-size: 12px;
+        }
+
+        select,
+        input {
+            width: 100%;
+            min-height: 40px;
+            padding: 9px 11px;
+            outline: none;
+            background: #fff;
+            border: 1px solid #b9bec2;
+            border-radius: 5px;
+            color: var(--zd-text);
+            font-size: 14px;
+        }
+
+        select:focus,
+        input:focus {
+            border-color: var(--zd-blue);
+            box-shadow: 0 0 0 2px rgba(31, 115, 183, 0.18);
+        }
+
+        select:disabled,
+        input:disabled {
+            background: #f5f5f5;
+            color: #879099;
+            cursor: not-allowed;
+        }
+
+        /* Searchable Group */
+
+        .group-selector {
+            position: relative;
+        }
+
+        .group-search {
+            margin-bottom: 6px;
+        }
+
+        .group-select {
+            max-height: 220px;
+        }
+
+        .loading-text {
+            color: var(--zd-muted);
+            font-style: italic;
+        }
+
+        /* Buttons */
+
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-top: 20px;
+            padding-top: 18px;
+            border-top: 1px solid var(--zd-border);
+        }
+
+        .left-actions,
+        .right-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        button {
+            min-height: 40px;
+            padding: 9px 16px;
+            border: 0;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition:
+                background 0.15s ease,
+                opacity 0.15s ease;
+        }
+
+        button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--zd-blue);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--zd-blue-dark);
+        }
+
+        .btn-success {
+            background: var(--zd-green);
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #026241;
+        }
+
+        .btn-secondary {
+            background: #fff;
+            border: 1px solid #b9bec2;
+            color: var(--zd-text);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--zd-hover);
+        }
+
+        .btn-danger {
+            min-height: 32px;
+            padding: 6px 11px;
+            background: transparent;
+            border: 1px solid #e3a6a9;
+            color: var(--zd-red);
+            font-size: 12px;
+        }
+
+        .btn-danger:hover {
+            background: #fff3f3;
+        }
+
+        /* Counters */
+
+        .data-summary {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .summary-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 9px;
+            background: #f1f2f2;
+            border-radius: 12px;
+            color: #59636b;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .summary-pill.ready {
+            background: #e9f7f1;
+            color: #176b4c;
+        }
+
+        .summary-pill.error {
+            background: #fff0f0;
+            color: #a91e23;
+        }
+
+        /* Rules */
+
+        .rules-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .rules-count {
+            color: var(--zd-muted);
+            font-size: 13px;
+        }
+
+        .rule-list {
+            padding: 0;
+        }
+
+        .empty-state {
+            padding: 35px 20px;
+            text-align: center;
+            color: var(--zd-muted);
+        }
+
+        .empty-state strong {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--zd-text);
+            font-size: 14px;
+        }
+
+        .rule-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--zd-border);
+        }
+
+        .rule-item:last-child {
+            border-bottom: 0;
+        }
+
+        .rule-main {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .rule-title {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 6px;
+        }
+
+        .rule-field {
+            color: #1f2a30;
+            font-weight: 600;
+        }
+
+        .rule-details {
+            color: var(--zd-muted);
+            font-size: 13px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            line-height: 14px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            text-transform: uppercase;
+        }
+
+        .pill-hide {
+            background: #fff1e6;
+            color: #a35c00;
+        }
+
+        .pill-disable {
+            background: #fdeaea;
+            color: #b3261e;
+        }
+
+        .pill-require {
+            background: #e8effd;
+            color: #1f4fb3;
+        }
+
+        .pill-group {
+            background: #eee9fc;
+            color: #5c3bb3;
+        }
+
+        /* Footer */
+
+        .footer-note {
+            margin-top: 8px;
+            color: var(--zd-muted);
+            font-size: 12px;
+            line-height: 18px;
+        }
+
+        /* Responsive */
+
+        @media (max-width: 900px) {
+            .page {
+                padding: 20px;
+            }
+
+            .rule-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .rule-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .left-actions,
+            .right-actions {
+                width: 100%;
+            }
+
+            button {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+
+        <div class="header">
+            <h1>Dynamic Field Manager</h1>
+            <p>
+                Configure ticket field behaviour based on the ticket status
+                and group. Rules are enforced automatically in the background
+                and checked again when an agent attempts to save a ticket.
+            </p>
+        </div>
+
+        <div id="status-banner" class="status-banner">
+            <div
+                id="status-spinner"
+                class="spinner"
+                style="display: none;">
+            </div>
+
+            <span id="status-message"></span>
+        </div>
+
+        <!-- Rule Builder -->
+
+        <div class="card">
+            <div class="card-header">
+                <h2>Create a field rule</h2>
+
+                <p>
+                    Define what happens to a ticket field when a particular
+                    status and group condition is met.
+                </p>
+
+                <div class="data-summary">
+                    <span id="field-count" class="summary-pill">
+                        Fields: loading...
+                    </span>
+
+                    <span id="group-count" class="summary-pill">
+                        Groups: loading...
+                    </span>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="rule-grid">
+
+                    <div class="field-group">
+                        <label for="field-select">
+                            Ticket field
+                        </label>
+
+                        <select id="field-select" disabled>
+                            <option>Loading fields...</option>
+                        </select>
+
+                        <div class="field-help">
+                            Select the field affected by this rule.
+                        </div>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="rule-action">
+                            Action
+                        </label>
+
+                        <select id="rule-action">
+                            <option value="hide">
+                                Hide field
+                            </option>
+
+                            <option value="disable">
+                                Disable field
+                            </option>
+
+                            <option value="require">
+                                Require field
+                            </option>
+                        </select>
+
+                        <div class="field-help">
+                            Determines what happens when the rule applies.
+                        </div>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="trigger-status">
+                            Ticket status
+                        </label>
+
+                        <select id="trigger-status">
+                            <option value="new">New</option>
+                            <option value="open" selected>Open</option>
+                            <option value="pending">Pending</option>
+                            <option value="hold">On-hold</option>
+                            <option value="solved">Solved</option>
+                            <option value="closed">Closed</option>
+                        </select>
+
+                        <div class="field-help">
+                            Apply the rule when the ticket has this status.
+                        </div>
+                    </div>
+
+                    <div class="field-group group-selector">
+                        <label for="group-search">
+                            Ticket group
+                        </label>
+
+                        <input
+                            id="group-search"
+                            class="group-search"
+                            type="search"
+                            placeholder="Search groups..."
+                            disabled
+                        >
+
+                        <select
+                            id="rule-group"
+                            class="group-select"
+                            size="5"
+                            disabled>
+                            <option value="">
+                                All groups
+                            </option>
+                        </select>
+
+                        <div class="field-help">
+                            Leave "All groups" selected to make the rule global.
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="actions">
+
+                    <div class="left-actions">
+                        <button
+                            id="add-rule-btn"
+                            class="btn-primary"
+                            disabled>
+                            Add rule
+                        </button>
+
+                        <button
+                            id="clear-btn"
+                            class="btn-secondary">
+                            Clear
+                        </button>
+                    </div>
+
+                    <div class="right-actions">
+                        <button
+                            id="save-btn"
+                            class="btn-success">
+                            Save configuration
+                        </button>
+                    </div>
+
+                </div>
+
+                <div class="footer-note">
+                    Configuration is stored in this Zendesk app installation
+                    and is available to the background and ticket-side
+                    components of the app.
+                </div>
+            </div>
+        </div>
+
+        <!-- Existing Rules -->
+
+        <div class="card">
+            <div class="card-header">
+                <div class="rules-header">
+                    <div>
+                        <h2>Current rules</h2>
+
+                        <p>
+                            Rules currently configured for this installation.
+                        </p>
+                    </div>
+
+                    <span id="rules-count" class="rules-count">
+                        0 rules
+                    </span>
+                </div>
+            </div>
+
+            <div id="rule-list" class="rule-list"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const client = ZAFClient.init();
+
+        let appInstallationId = null;
+        let configRules = [];
+        let fieldCatalog = [];
+        let groupCatalog = [];
+
+        const STATUS_LABELS = {
+            new: 'New',
+            open: 'Open',
+            pending: 'Pending',
+            hold: 'On-hold',
+            solved: 'Solved',
+            closed: 'Closed'
+        };
+
+        /*
+         * These are the standard Zendesk ticket field types.
+         *
+         * Anything not in this list is treated as a custom field and
+         * represented internally as custom_field_<id>.
+         */
+        const STANDARD_FIELD_TYPES = {
+            subject: 'subject',
+            description: 'description',
+            status: 'status',
+            tickettype: 'type',
+            priority: 'priority',
+            group: 'group',
+            assignee: 'assignee'
+        };
+
+        /* -----------------------------------------------------------
+         * Utility functions
+         * ----------------------------------------------------------- */
+
+        function fieldKeyFor(field) {
+            if (STANDARD_FIELD_TYPES[field.type]) {
+                return STANDARD_FIELD_TYPES[field.type];
+            }
+
+            return `custom_field_${field.id}`;
+        }
+
+        function setStatus(message, type = 'info', loading = false) {
+            const banner = document.getElementById('status-banner');
+            const messageEl = document.getElementById('status-message');
+            const spinner = document.getElementById('status-spinner');
+
+            banner.className = `status-banner visible ${type}`;
+            messageEl.textContent = message;
+            spinner.style.display = loading ? 'block' : 'none';
+        }
+
+        function clearStatus() {
+            const banner = document.getElementById('status-banner');
+
+            banner.className = 'status-banner';
+
+            document.getElementById('status-message').textContent = '';
+        }
+
+        async function notify(message, type = 'info') {
+            try {
+                await client.invoke('notify', message, type);
+            } catch (error) {
+                console.warn(
+                    'Zendesk notification failed:',
+                    error
+                );
+            }
+        }
+
+        function updateCount(
+            elementId,
+            label,
+            count,
+            state = 'ready'
+        ) {
+            const element =
+                document.getElementById(elementId);
+
+            element.textContent = `${label}: ${count}`;
+            element.className =
+                `summary-pill ${state}`;
+        }
+
+        /* -----------------------------------------------------------
+         * Zendesk API helpers
+         * ----------------------------------------------------------- */
+
+        async function getAllCursorPages(
+            endpoint,
+            resultKey
+        ) {
+            const results = [];
+            let url = endpoint;
+            let safetyCounter = 0;
+
+            while (url && safetyCounter < 200) {
+                safetyCounter++;
+
+                console.log(`Requesting: ${url}`);
+
+                const response = await client.request({
+                    url,
+                    type: 'GET',
+                    dataType: 'json'
+                });
+
+                const pageResults =
+                    Array.isArray(response[resultKey])
+                        ? response[resultKey]
+                        : [];
+
+                results.push(...pageResults);
+
+                /*
+                 * Preferred Zendesk cursor pagination.
+                 *
+                 * Example:
+                 *
+                 * meta.has_more = true
+                 * meta.after_cursor = "..."
+                 */
+
+                if (
+                    response.meta &&
+                    response.meta.has_more &&
+                    response.meta.after_cursor
+                ) {
+                    const separator =
+                        endpoint.includes('?')
+                            ? '&'
+                            : '?';
+
+                    url =
+                        `${endpoint}${separator}` +
+                        `page[size]=100&` +
+                        `page[after]=${encodeURIComponent(
+                            response.meta.after_cursor
+                        )}`;
+
+                    continue;
+                }
+
+                /*
+                 * Some Zendesk responses expose next_page instead.
+                 */
+
+                if (response.next_page) {
+                    url = response.next_page;
+                    continue;
+                }
+
+                /*
+                 * No more pages.
+                 */
+
+                url = null;
+            }
+
+            if (safetyCounter >= 200) {
+                console.warn(
+                    `Pagination stopped after ${safetyCounter} requests.`
+                );
+            }
+
+            return results;
+        }
+
+        /* -----------------------------------------------------------
+         * Load ticket fields
+         * ----------------------------------------------------------- */
+
+        async function loadFields() {
+            const fieldSelect =
+                document.getElementById('field-select');
+
+            fieldSelect.disabled = true;
+            fieldSelect.innerHTML = '';
+
+            const loadingOption =
+                document.createElement('option');
+
+            loadingOption.textContent =
+                'Loading ticket fields...';
+
+            fieldSelect.appendChild(loadingOption);
+
+            try {
+                /*
+                 * Use cursor pagination first.
+                 *
+                 * The API can return considerably more fields than
+                 * a single response.
+                 */
+
+                let fields = [];
+
+                try {
+                    fields = await getAllCursorPages(
+                        '/api/v2/ticket_fields.json?page[size]=100',
+                        'ticket_fields'
+                    );
+                } catch (cursorError) {
+                    console.warn(
+                        'Cursor pagination for ticket fields failed. ' +
+                        'Trying page-based pagination.',
+                        cursorError
+                    );
+
+                    /*
+                     * Fallback for older/API proxy behaviour.
+                     */
+
+                    fields = [];
+
+                    for (
+                        let page = 1;
+                        page <= 100;
+                        page++
+                    ) {
+                        const response =
+                            await client.request({
+                                url:
+                                    `/api/v2/ticket_fields.json` +
+                                    `?page=${page}&per_page=100`,
+                                type: 'GET',
+                                dataType: 'json'
+                            });
+
+                        const pageFields =
+                            response.ticket_fields || [];
+
+                        fields.push(...pageFields);
+
+                        if (pageFields.length < 100) {
+                            break;
+                        }
+                    }
+                }
+
+                /*
+                 * Remove inactive fields and the status field.
+                 *
+                 * Status is deliberately excluded because changing
+                 * the status field itself would not be a useful
+                 * field rule.
+                 */
+
+                fieldCatalog = fields
+                    .filter(
+                        field =>
+                            field.active !== false &&
+                            field.type !== 'status'
+                    )
+                    .map(field => {
+                        const key = fieldKeyFor(field);
+
+                        return {
+                            key,
+                            label: field.title || key,
+                            displayLabel:
+                                `${field.title || key} (${key})`
+                        };
+                    });
+
+                /*
+                 * Remove duplicate field keys.
+                 */
+
+                const uniqueFields = new Map();
+
+                fieldCatalog.forEach(field => {
+                    if (!uniqueFields.has(field.key)) {
+                        uniqueFields.set(field.key, field);
+                    }
+                });
+
+                fieldCatalog =
+                    Array.from(uniqueFields.values());
+
+                fieldCatalog.sort((a, b) =>
+                    a.label.localeCompare(b.label)
+                );
+
+                fieldSelect.innerHTML = '';
+
+                if (fieldCatalog.length === 0) {
+                    const option =
+                        document.createElement('option');
+
+                    option.textContent =
+                        'No ticket fields found';
+
+                    fieldSelect.appendChild(option);
+
+                    updateCount(
+                        'field-count',
+                        'Fields',
+                        0,
+                        'error'
+                    );
+
+                    return;
+                }
+
+                fieldCatalog.forEach(field => {
+                    const option =
+                        document.createElement('option');
+
+                    option.value = field.key;
+                    option.textContent =
+                        field.displayLabel;
+
+                    fieldSelect.appendChild(option);
+                });
+
+                fieldSelect.disabled = false;
+
+                document.getElementById(
+                    'add-rule-btn'
+                ).disabled = false;
+
+                updateCount(
+                    'field-count',
+                    'Fields',
+                    fieldCatalog.length,
+                    'ready'
+                );
+
+                console.log(
+                    `Loaded ${fieldCatalog.length} ticket fields.`
+                );
+            } catch (error) {
+                console.error(
+                    'Failed to load ticket fields:',
+                    error
+                );
+
+                fieldSelect.innerHTML = '';
+
+                const option =
+                    document.createElement('option');
+
+                option.textContent =
+                    'Unable to load ticket fields';
+
+                fieldSelect.appendChild(option);
+
+                updateCount(
+                    'field-count',
+                    'Fields',
+                    0,
+                    'error'
+                );
+
+                setStatus(
+                    'Unable to load ticket fields from Zendesk. ' +
+                    'Check the browser console for the API response.',
+                    'error'
+                );
+            }
+        }
+
+        /* -----------------------------------------------------------
+         * Load groups
+         * ----------------------------------------------------------- */
+
+        async function loadGroups() {
+            const groupSelect =
+                document.getElementById('rule-group');
+
+            const groupSearch =
+                document.getElementById('group-search');
+
+            groupSelect.disabled = true;
+            groupSearch.disabled = true;
+
+            try {
+                let groups = [];
+
+                /*
+                 * FIRST ATTEMPT:
+                 * Zendesk cursor pagination.
+                 */
+
+                try {
+                    groups = await getAllCursorPages(
+                        '/api/v2/groups.json?page[size]=100',
+                        'groups'
+                    );
+                } catch (cursorError) {
+                    console.warn(
+                        'Cursor pagination failed. ' +
+                        'Falling back to page pagination.',
+                        cursorError
+                    );
+
+                    /*
+                     * FALLBACK:
+                     * Explicit page numbers.
+                     *
+                     * We intentionally continue while the API
+                     * returns a full page.
+                     */
+
+                    groups = [];
+
+                    for (
+                        let page = 1;
+                        page <= 200;
+                        page++
+                    ) {
+                        console.log(
+                            `Loading groups page ${page}`
+                        );
+
+                        const response =
+                            await client.request({
+                                url:
+                                    `/api/v2/groups.json` +
+                                    `?page=${page}&per_page=100`,
+                                type: 'GET',
+                                dataType: 'json'
+                            });
+
+                        const pageGroups =
+                            response.groups || [];
+
+                        console.log(
+                            `Page ${page}: ${pageGroups.length} groups`
+                        );
+
+                        groups.push(...pageGroups);
+
+                        /*
+                         * If there are fewer than 100 records,
+                         * this is the final page.
+                         */
+
+                        if (pageGroups.length < 100) {
+                            break;
+                        }
+                    }
+                }
+
+                /*
+                 * Build the local group catalogue.
+                 */
+
+                groupCatalog = groups
+                    .filter(
+                        group =>
+                            group &&
+                            group.id !== undefined &&
+                            group.name
+                    )
+                    .map(group => ({
+                        id: String(group.id),
+                        name: group.name
+                    }));
+
+                /*
+                 * Remove duplicate IDs.
+                 */
+
+                const uniqueGroups = new Map();
+
+                groupCatalog.forEach(group => {
+                    if (!uniqueGroups.has(group.id)) {
+                        uniqueGroups.set(group.id, group);
+                    }
+                });
+
+                groupCatalog =
+                    Array.from(uniqueGroups.values());
+
+                groupCatalog.sort((a, b) =>
+                    a.name.localeCompare(b.name)
+                );
+
+                /*
+                 * Populate the group selector.
+                 */
+
+                populateGroupSelect(groupCatalog);
+
+                groupSelect.disabled = false;
+                groupSearch.disabled = false;
+
+                updateCount(
+                    'group-count',
+                    'Groups',
+                    groupCatalog.length,
+                    'ready'
+                );
+
+                console.log(
+                    `Loaded ${groupCatalog.length} Zendesk groups.`
+                );
+            } catch (error) {
+                console.error(
+                    'Failed to load Zendesk groups:',
+                    error
+                );
+
+                groupSelect.innerHTML = '';
+
+                const option =
+                    document.createElement('option');
+
+                option.value = '';
+                option.textContent =
+                    'Unable to load groups';
+
+                groupSelect.appendChild(option);
+
+                updateCount(
+                    'group-count',
+                    'Groups',
+                    0,
+                    'error'
+                );
+
+                setStatus(
+                    'Unable to load Zendesk groups. ' +
+                    'Check the browser console for the API response.',
+                    'error'
+                );
+            }
+        }
+
+        /* -----------------------------------------------------------
+         * Group selector
+         * ----------------------------------------------------------- */
+
+        function populateGroupSelect(groups) {
+            const groupSelect =
+                document.getElementById('rule-group');
+
+            groupSelect.innerHTML = '';
+
+            /*
+             * Global option.
+             */
+
+            const allOption =
+                document.createElement('option');
+
+            allOption.value = '';
+            allOption.textContent = 'All groups';
+
+            groupSelect.appendChild(allOption);
+
+            groups.forEach(group => {
+                const option =
+                    document.createElement('option');
+
+                option.value = group.id;
+                option.textContent = group.name;
+
+                groupSelect.appendChild(option);
+            });
+        }
+
+        function filterGroups(searchTerm) {
+            const term =
+                String(searchTerm || '')
+                    .trim()
+                    .toLowerCase();
+
+            if (!term) {
+                populateGroupSelect(groupCatalog);
+                return;
+            }
+
+            const filtered =
+                groupCatalog.filter(group =>
+                    group.name
+                        .toLowerCase()
+                        .includes(term)
+                );
+
+            populateGroupSelect(filtered);
+        }
+
+        /* -----------------------------------------------------------
+         * Rules
+         * ----------------------------------------------------------- */
+
+        function addRule() {
+            const fieldSelect =
+                document.getElementById('field-select');
+
+            const action =
+                document.getElementById('rule-action').value;
+
+            const triggerStatus =
+                document.getElementById(
+                    'trigger-status'
+                ).value;
+
+            const groupSelect =
+                document.getElementById('rule-group');
+
+            const fieldKey =
+                fieldSelect.value;
+
+            if (!fieldKey) {
+                setStatus(
+                    'Please select a ticket field.',
+                    'error'
+                );
+
+                return;
+            }
+
+            const selectedField =
+                fieldCatalog.find(
+                    field => field.key === fieldKey
+                );
+
+            const groupId =
+                groupSelect.value || '';
+
+            let groupLabel = '';
+
+            if (groupId) {
+                const selectedGroup =
+                    groupCatalog.find(
+                        group =>
+                            group.id === String(groupId)
+                    );
+
+                groupLabel =
+                    selectedGroup
+                        ? selectedGroup.name
+                        : groupSelect.options[
+                            groupSelect.selectedIndex
+                        ].textContent;
+            }
+
+            /*
+             * Prevent duplicate rules.
+             */
+
+            const duplicate =
+                configRules.some(rule =>
+                    rule.fieldKey === fieldKey &&
+                    rule.action === action &&
+                    rule.triggerStatus === triggerStatus &&
+                    String(rule.groupId || '') ===
+                        String(groupId)
+                );
+
+            if (duplicate) {
+                setStatus(
+                    'That rule already exists.',
+                    'error'
+                );
+
+                return;
+            }
+
+            configRules.push({
+                id:
+                    `rule_${Date.now()}_` +
+                    Math.random()
+                        .toString(36)
+                        .slice(2, 8),
+
+                fieldKey,
+
+                fieldLabel:
+                    selectedField
+                        ? selectedField.displayLabel
+                        : fieldKey,
+
+                action,
+                triggerStatus,
+                groupId,
+                groupLabel
+            });
+
+            renderRules();
+
+            setStatus(
+                'Rule added. Save the configuration to apply it.',
+                'success'
+            );
+        }
+
+        function renderRules() {
+            const list =
+                document.getElementById('rule-list');
+
+            const count =
+                document.getElementById('rules-count');
+
+            count.textContent =
+                `${configRules.length} ${
+                    configRules.length === 1
+                        ? 'rule'
+                        : 'rules'
+                }`;
+
+            list.innerHTML = '';
+
+            if (configRules.length === 0) {
+                const empty =
+                    document.createElement('div');
+
+                empty.className = 'empty-state';
+
+                const strong =
+                    document.createElement('strong');
+
+                strong.textContent =
+                    'No rules configured';
+
+                const text =
+                    document.createElement('div');
+
+                text.textContent =
+                    'Create your first rule above to control ' +
+                    'ticket fields dynamically.';
+
+                empty.appendChild(strong);
+                empty.appendChild(text);
+
+                list.appendChild(empty);
+
+                return;
+            }
+
+            configRules.forEach((rule, index) => {
+                const row =
+                    document.createElement('div');
+
+                row.className = 'rule-item';
+
+                const main =
+                    document.createElement('div');
+
+                main.className = 'rule-main';
+
+                const title =
+                    document.createElement('div');
+
+                title.className = 'rule-title';
+
+                const actionPill =
+                    document.createElement('span');
+
+                actionPill.className =
+                    'pill ' +
+                    (
+                        rule.action === 'disable'
+                            ? 'pill-disable'
+                            : rule.action === 'require'
+                                ? 'pill-require'
+                                : 'pill-hide'
+                    );
+
+                actionPill.textContent =
+                    rule.action;
+
+                const field =
+                    document.createElement('span');
+
+                field.className = 'rule-field';
+
+                field.textContent =
+                    rule.fieldLabel ||
+                    rule.fieldKey;
+
+                const groupPill =
+                    document.createElement('span');
+
+                groupPill.className =
+                    'pill pill-group';
+
+                groupPill.textContent =
+                    rule.groupId
+                        ? (
+                            rule.groupLabel ||
+                            rule.groupId
+                        )
+                        : 'All groups';
+
+                title.appendChild(actionPill);
+                title.appendChild(field);
+                title.appendChild(groupPill);
+
+                const details =
+                    document.createElement('div');
+
+                details.className =
+                    'rule-details';
+
+                details.textContent =
+                    `When ticket status is ${
+                        STATUS_LABELS[
+                            rule.triggerStatus
+                        ] ||
+                        rule.triggerStatus
+                    }`;
+
+                main.appendChild(title);
+                main.appendChild(details);
+
+                const removeButton =
+                    document.createElement('button');
+
+                removeButton.className =
+                    'btn-danger';
+
+                removeButton.textContent =
+                    'Remove';
+
+                removeButton.addEventListener(
+                    'click',
+                    () => removeRule(index)
+                );
+
+                row.appendChild(main);
+                row.appendChild(removeButton);
+
+                list.appendChild(row);
+            });
+        }
+
+        function removeRule(index) {
+            configRules.splice(index, 1);
+
+            renderRules();
+
+            setStatus(
+                'Rule removed. Save the configuration to persist the change.',
+                'info'
+            );
+        }
+
+        function clearBuilder() {
+            document.getElementById(
+                'rule-action'
+            ).value = 'hide';
+
+            document.getElementById(
+                'trigger-status'
+            ).value = 'open';
+
+            document.getElementById(
+                'group-search'
+            ).value = '';
+
+            populateGroupSelect(groupCatalog);
+
+            document.getElementById(
+                'rule-group'
+            ).value = '';
+        }
+
+        /* -----------------------------------------------------------
+         * Save configuration
+         * ----------------------------------------------------------- */
+
+        async function saveConfiguration() {
+            const saveButton =
+                document.getElementById('save-btn');
+
+            if (!appInstallationId) {
+                setStatus(
+                    'The Zendesk app installation ID is not available.',
+                    'error'
+                );
+
+                return;
+            }
+
+            const payload = {
+                settings: {
+                    field_rules_config:
+                        JSON.stringify(configRules)
+                }
+            };
+
+            saveButton.disabled = true;
+            saveButton.textContent = 'Saving...';
+
+            setStatus(
+                'Saving configuration...',
+                'info',
+                true
+            );
+
+            try {
+                await client.request({
+                    url:
+                        `/api/v2/apps/installations/` +
+                        `${appInstallationId}.json`,
+
+                    type: 'PUT',
+
+                    contentType:
+                        'application/json',
+
+                    dataType:
+                        'json',
+
+                    data:
+                        JSON.stringify(payload)
+                });
+
+                setStatus(
+                    'Configuration saved successfully.',
+                    'success'
+                );
+
+                await notify(
+                    'Dynamic field rules saved successfully.',
+                    'success'
+                );
+            } catch (error) {
+                console.error(
+                    'Error saving configuration:',
+                    error
+                );
+
+                let detail = 'Unknown error';
+
+                if (error) {
+                    detail =
+                        error.responseText ||
+                        error.statusText ||
+                        error.status ||
+                        detail;
+                }
+
+                setStatus(
+                    `Failed to save configuration: ${detail}`,
+                    'error'
+                );
+
+                await notify(
+                    'Failed to save dynamic field rules.',
+                    'error'
+                );
+            } finally {
+                saveButton.disabled = false;
+                saveButton.textContent =
+                    'Save configuration';
+            }
+        }
+
+        /* -----------------------------------------------------------
+         * Initialization
+         * ----------------------------------------------------------- */
+
+        async function initializeApp() {
+            setStatus(
+                'Connecting to Zendesk...',
+                'info',
+                true
+            );
+
+            try {
+                const metadata =
+                    await client.metadata();
+
+                /*
+                 * Correct source for installationId.
+                 */
+
+                appInstallationId =
+                    metadata.installationId;
+
+                if (!appInstallationId) {
+                    throw new Error(
+                        'Zendesk did not provide an installation ID.'
+                    );
+                }
+
+                /*
+                 * Load stored configuration.
+                 */
+
+                let storedRules = [];
+
+                try {
+                    storedRules =
+                        JSON.parse(
+                            metadata.settings
+                                .field_rules_config ||
+                            '[]'
+                        );
+                } catch (error) {
+                    console.warn(
+                        'Stored rule configuration is invalid JSON. ' +
+                        'Starting with no rules.',
+                        error
+                    );
+
+                    storedRules = [];
+                }
+
+                configRules =
+                    Array.isArray(storedRules)
+                        ? storedRules
+                        : [];
+
+                renderRules();
+
+                /*
+                 * Load both catalogues independently.
+                 *
+                 * If one fails, the other can still load.
+                 */
+
+                setStatus(
+                    'Loading ticket fields and groups...',
+                    'info',
+                    true
+                );
+
+                await Promise.allSettled([
+                    loadFields(),
+                    loadGroups()
+                ]);
+
+                /*
+                 * Don't leave the user staring at a permanent
+                 * loading message.
+                 */
+
+                const fieldCount =
+                    fieldCatalog.length;
+
+                const groupCount =
+                    groupCatalog.length;
+
+                if (
+                    fieldCount > 0 &&
+                    groupCount > 0
+                ) {
+                    setStatus(
+                        `Ready. Loaded ${fieldCount} fields and ` +
+                        `${groupCount} groups.`,
+                        'success'
+                    );
+                } else {
+                    setStatus(
+                        'The app loaded, but one or more Zendesk ' +
+                        'catalogues could not be retrieved. ' +
+                        'Check the counts above and the browser console.',
+                        'error'
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    'Application initialization failed:',
+                    error
+                );
+
+                setStatus(
+                    'Unable to initialize the Dynamic Field Manager. ' +
+                    'Check the browser console.',
+                    'error'
+                );
+            }
+        }
+
+        /* -----------------------------------------------------------
+         * Event handlers
+         * ----------------------------------------------------------- */
+
+        document
+            .getElementById('add-rule-btn')
+            .addEventListener(
+                'click',
+                addRule
+            );
+
+        document
+            .getElementById('save-btn')
+            .addEventListener(
+                'click',
+                saveConfiguration
+            );
+
+        document
+            .getElementById('clear-btn')
+            .addEventListener(
+                'click',
+                clearBuilder
+            );
+
+        document
+            .getElementById('group-search')
+            .addEventListener(
+                'input',
+                event =>
+                    filterGroups(event.target.value)
+            );
+
+        /*
+         * Start application.
+         */
+
+        initializeApp();
+    </script>
+</body>
+</html>

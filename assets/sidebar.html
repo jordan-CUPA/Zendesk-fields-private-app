@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dynamic Field Manager - Save Guard</title>
+    <script type="text/javascript" src="https://static.zdassets.com/zendesk_app_framework_sdk/2.0/zaf_sdk.min.js"></script>
+    <script type="text/javascript" src="lib/rule-engine.js"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; font-size: 12px; color: #333; text-align: center; margin: 8px 0; }
+        #status.error { color: #d8262c; }
+    </style>
+</head>
+<body>
+    <div id="status">Field rules active.</div>
+
+    <script>
+        // Ticket field actions and save hooks are both supported in the sidebar.
+        const client = ZAFClient.init();
+        let activeRules = [];
+        let saveHandlerRegistered = false;
+
+        client.on('app.registered', async () => {
+            activeRules = await RuleEngine.loadRules(client);
+
+            if (!saveHandlerRegistered) {
+                saveHandlerRegistered = true;
+                client.on('ticket.save', enforceBlockingRules);
+            }
+
+            client.on('ticket.status.changed', applyFieldRules);
+            client.on('ticket.assignee.group.id.changed', applyFieldRules);
+            await applyFieldRules();
+        });
+
+        async function applyFieldRules() {
+            let status;
+            try {
+                status = await RuleEngine.currentStatus(client);
+            } catch (e) {
+                console.error('Could not read ticket.status while applying field rules.', e);
+                return;
+            }
+
+            let groupId;
+            try {
+                groupId = await RuleEngine.currentGroupId(client);
+            } catch (e) {
+                console.error('Could not read ticket.assignee.group.id while applying field rules.', e);
+                return;
+            }
+
+            const invokeCalls = RuleEngine.getFieldActionCalls(activeRules, status, groupId);
+            if (Object.keys(invokeCalls).length === 0) return;
+
+            try {
+                await client.invoke(invokeCalls);
+            } catch (e) {
+                console.warn('Bulk field action failed, retrying individually.', e);
+                for (const [path, args] of Object.entries(invokeCalls)) {
+                    try {
+                        await client.invoke(path, ...args);
+                    } catch (innerErr) {
+                        console.error(`Failed to apply field action "${path}".`, innerErr);
+                    }
+                }
+            }
+        }
+
+        async function enforceBlockingRules() {
+            let status;
+            try {
+                status = await RuleEngine.currentStatus(client);
+            } catch (e) {
+                console.error('Could not read ticket.status during save check.', e);
+                return true; // fail open rather than blocking every save on an error
+            }
+
+            let groupId;
+            try {
+                groupId = await RuleEngine.currentGroupId(client);
+            } catch (e) {
+                console.error('Could not read ticket.assignee.group.id during save check.', e);
+                return true; // fail open rather than blocking every save on an error
+            }
+
+            // 1) "disable" rules: hard-block saving while this status is active,
+            //    as a safety net in case the field wasn't actually greyed out
+            //    (e.g. the rule config changed after the ticket was opened).
+            const disableRule = activeRules.find(r =>
+                r.action === 'disable' && r.triggerStatus === status && RuleEngine.matchesGroup(r, groupId));
+            if (disableRule) {
+                return blockSave(`"${disableRule.fieldLabel || disableRule.fieldKey}" is locked while status is "${status}".`);
+            }
+
+            // 2) "require" rules: block saving if the field has no value while
+            //    this status is active (e.g. can't set status to Solved until
+            //    "Resolution Notes" is filled in).
+            const requireRules = activeRules.filter(r =>
+                r.action === 'require' && r.triggerStatus === status && RuleEngine.matchesGroup(r, groupId));
+            for (const rule of requireRules) {
+                const path = RuleEngine.getPathFor(rule.fieldKey);
+                let fieldData;
+                try {
+                    fieldData = await client.get(path);
+                } catch (e) {
+                    console.error(`Could not read value for "${rule.fieldKey}" during save check.`, e);
+                    continue; // don't block the save just because we couldn't read the field
+                }
+                if (RuleEngine.isEmpty(fieldData[path])) {
+                    return blockSave(`"${rule.fieldLabel || rule.fieldKey}" is required before status can be "${status}".`);
+                }
+            }
+
+            return true; // nothing blocked the save
+        }
+
+let lastBlockedMessage = '';
+let lastBlockedTime = 0;
+
+async function blockSave(message) {
+    const cleanMessage = message.replace(
+        /\s*\(custom_field_\d+\)/gi,
+        ''
+    );
+
+    setStatusText(cleanMessage, true);
+
+    const now = Date.now();
+    const isDuplicate =
+        lastBlockedMessage === cleanMessage &&
+        now - lastBlockedTime < 2000;
+
+    if (!isDuplicate) {
+        lastBlockedMessage = cleanMessage;
+        lastBlockedTime = now;
+
+        try {
+            await client.invoke(
+                'notify',
+                `Cannot save: ${cleanMessage}`,
+                'error'
+            );
+        } catch (notifyErr) {
+            console.warn(
+                'notify() failed while blocking save:',
+                notifyErr
+            );
+        }
+
+        console.warn(
+            'Ticket save blocked by rule engine:',
+            cleanMessage
+        );
+    } else {
+        console.warn(
+            'Duplicate notification suppressed:',
+            cleanMessage
+        );
+    }
+
+    return Promise.reject(
+        `Cannot save: ${cleanMessage}`
+    );
+}
+        function setStatusText(text, isError) {
+            const el = document.getElementById('status');
+            el.textContent = text;
+            el.className = isError ? 'error' : '';
+        }
+    </script>
+</body>
+</html>

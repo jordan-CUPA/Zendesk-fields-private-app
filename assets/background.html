@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dynamic Field Manager - Background</title>
+    <script type="text/javascript" src="https://static.zdassets.com/zendesk_app_framework_sdk/2.0/zaf_sdk.min.js"></script>
+    <script type="text/javascript" src="lib/rule-engine.js"></script>
+</head>
+<body>
+    <!--
+        This app has no visible UI (Support "background" location - see manifest.json).
+        It loads and starts running as soon as a ticket is opened, without the agent
+        needing to click any app icon, and stays running for the life of the ticket tab.
+        Its only job is to keep "hide" and "disable" field rules in sync with the
+        ticket's current status. Save-time blocking ("disable" as a hard block, and
+        "require") lives in assets/sidebar.html instead, because the ticket.save hook
+        that can actually reject a save is only available in the ticket_sidebar /
+        new_ticket_sidebar locations, not in background.
+    -->
+    <script>
+        const client = ZAFClient.init();
+        let activeRules = [];
+
+        client.on('app.registered', async () => {
+            activeRules = await RuleEngine.loadRules(client);
+            client.on('ticket.status.changed', applyVisibilityRules);
+            client.on('ticket.assignee.group.id.changed', applyVisibilityRules);
+            await applyVisibilityRules();
+        });
+
+        async function applyVisibilityRules() {
+            let status;
+            try {
+                status = await RuleEngine.currentStatus(client);
+            } catch (e) {
+                console.error('[background] Could not read ticket.status.', e);
+                return;
+            }
+
+            let groupId;
+            try {
+                groupId = await RuleEngine.currentGroupId(client);
+            } catch (e) {
+                console.error('[background] Could not read ticket.assignee.group.id.', e);
+                return;
+            }
+
+            const invokeCalls = RuleEngine.getFieldActionCalls(activeRules, status, groupId);
+
+            if (Object.keys(invokeCalls).length === 0) return;
+
+            try {
+                await client.invoke(invokeCalls);
+            } catch (e) {
+                // Don't let one bad/renamed field id in a saved rule silently kill
+                // every other rule - retry each call on its own and log failures.
+                console.warn('[background] Bulk invoke failed, retrying individually.', e);
+                for (const [path, args] of Object.entries(invokeCalls)) {
+                    try {
+                        await client.invoke(path, ...args);
+                    } catch (innerErr) {
+                        console.error(`[background] Failed to apply rule action "${path}":`, innerErr);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
