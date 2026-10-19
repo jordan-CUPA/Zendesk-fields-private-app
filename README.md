@@ -1,14 +1,7 @@
-# App name
+# Zendesk Fields Private App
 
-[brief description of the app]
+1. Upload tmp > hello_world 2v16.zip as a private app in Zendesk Admin under Zendesk Support Apps
+2. Configure the application under the left sidebar of the Agent view 
 
-### The following information is displayed:
+ 
 
-* info1
-* info2
-* info3
-
-Please submit bug reports to [Insert Link](). Pull requests are welcome.
-
-### Screenshot(s):
-[put your screenshots down here.]
